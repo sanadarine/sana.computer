@@ -1,0 +1,2167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UAE Innovation Ecosystem - Interactive 3D World Map</title>
+    <style>
+        /* ------------------------------------------------------------------
+           Interface style: early 2000s Mac. White windows with rounded
+           corners and soft drop shadows, brushed title bars with traffic
+           light buttons, glossy capsule controls, pinstriped backdrop.
+           ------------------------------------------------------------------ */
+
+        :root {
+            --window: #ffffff;
+            --bar-top: #fdfdfd;
+            --bar-bottom: #dcdcdc;
+            --bar-line: #b3b3b3;
+            --rule: #d9d9d9;
+            --ink: #1d1d1f;
+            --ink-soft: #6e6e73;
+            --tint: #f5f6f8;
+            --tint-line: #dcdee2;
+            --accent-grey: #9a9aa0;
+            --blue: #3d8fe0;
+            --blue-deep: #2a6fb5;
+            --green: #52a447;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+            background: #eef1f5;
+            color: var(--ink);
+            font-size: 13px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .panel {
+            background: var(--window);
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.16);
+            box-shadow:
+                0 14px 34px rgba(0, 0, 0, 0.22),
+                0 2px 6px rgba(0, 0, 0, 0.12),
+                inset 0 1px 0 #ffffff;
+            overflow: hidden;
+        }
+
+        .title-bar {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 28px;
+            padding: 0 34px;
+            background: linear-gradient(180deg, var(--bar-top), var(--bar-bottom));
+            border-bottom: 1px solid var(--bar-line);
+            font-size: 13px;
+            font-weight: 700;
+            color: #4b4b4b;
+            text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+            user-select: none;
+        }
+
+        .title-bar span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* One close button per window, on the right of the title bar. */
+        .panel-close {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 19px;
+            height: 19px;
+            border-radius: 50%;
+            border: 1px solid #b6b6b6;
+            background: linear-gradient(180deg, #ffffff, #e8e8e8);
+            box-shadow: inset 0 1px 0 #ffffff;
+            color: #5a5a5f;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .panel-close:hover {
+            background: linear-gradient(180deg, #ffffff, #d8d8d8);
+            color: #1d1d1f;
+        }
+
+        .panel-close:active {
+            background: linear-gradient(180deg, #cfcfcf, #e4e4e4);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+
+        .win-body {
+            padding: 14px 16px 16px;
+        }
+
+        /* Capsule controls, white by default and glossy blue when chosen */
+        .filter-btn,
+        .btn {
+            border-radius: 999px;
+            background: linear-gradient(180deg, #ffffff, #ededed);
+            border: 1px solid #b6b6b6;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), inset 0 1px 0 #ffffff;
+            color: #2b2b2b;
+            font-size: 12px;
+            padding: 5px 14px;
+            cursor: pointer;
+            transition: background 0.12s, box-shadow 0.12s;
+        }
+
+        .filter-btn:hover,
+        .btn:hover {
+            background: linear-gradient(180deg, #ffffff, #e3e3e3);
+        }
+
+        .filter-btn:active,
+        .btn:active {
+            background: linear-gradient(180deg, #d8d8d8, #ececec);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.22);
+        }
+
+        .filter-btn.active,
+        .btn.primary {
+            background: linear-gradient(180deg, #8cc4f5 0%, #4b96e2 48%, #2f7ccb 52%, #63a9ec 100%);
+            border-color: var(--blue-deep);
+            color: #ffffff;
+            font-weight: 700;
+            text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.28);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+
+        .filter-btn:focus,
+        .btn:focus {
+            outline: 3px solid rgba(61, 143, 224, 0.45);
+            outline-offset: 1px;
+        }
+
+        /* A colour chip per pillar, matching that pillar on the map */
+        .filter-btn[data-pillar]::before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            vertical-align: 0;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .filter-btn[data-pillar="all"]::before { background: linear-gradient(135deg, #FF6B6B, #4ECDC4, #DDA0DD); }
+        .filter-btn[data-pillar="markets"]::before { background: #FF6B6B; }
+        .filter-btn[data-pillar="workforce"]::before { background: #4ECDC4; }
+        .filter-btn[data-pillar="funding"]::before { background: #FFE66D; }
+        .filter-btn[data-pillar="support"]::before { background: #95E1D3; }
+        .filter-btn[data-pillar="regulatory"]::before { background: #A8E6CF; }
+        .filter-btn[data-pillar="education"]::before { background: #FFB3BA; }
+        .filter-btn[data-pillar="universities"]::before { background: #DDA0DD; }
+        .filter-btn[data-pillar="culture"]::before { background: #F0E68C; }
+
+        /* ------------------------------- intro ---------------------------- */
+
+        #intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 900;
+            padding: 20px;
+            background:
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.55) 0 3px, rgba(255, 255, 255, 0) 3px 6px),
+                linear-gradient(160deg, #cfe4f7 0%, #e9eff6 45%, #f6f7f9 100%);
+        }
+
+        .intro-content {
+            max-width: 540px;
+            width: 100%;
+        }
+
+        .intro-content h1 {
+            font-size: 13px;
+        }
+
+        .intro-content h2 {
+            font-size: 16px;
+            font-weight: 400;
+            line-height: 1.6;
+            color: var(--ink);
+            margin-bottom: 12px;
+        }
+
+        .intro-credit {
+            font-size: 12px;
+            color: var(--ink-soft);
+            font-style: italic;
+            margin-bottom: 22px;
+        }
+
+        .intro-actions {
+            text-align: right;
+        }
+
+        .intro-actions .btn {
+            font-size: 14px;
+            padding: 8px 26px;
+        }
+
+        /* ------------------------------- scene ---------------------------- */
+
+        #main-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #scene-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #scene-container canvas {
+            display: block;
+            outline: none;
+        }
+
+        /* ----------------------------- controls --------------------------- */
+
+        #ui-controls {
+            position: absolute;
+            top: 18px;
+            left: 18px;
+            width: 312px;
+            z-index: 100;
+        }
+
+        #ui-controls h2 {
+            font-size: 13px;
+        }
+
+        .byline {
+            font-size: 12px;
+            color: var(--ink-soft);
+            font-style: italic;
+            padding-bottom: 12px;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--rule);
+        }
+
+        #ui-controls h3 {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--ink-soft);
+            margin: 0 0 10px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            min-width: 86px;
+            text-align: center;
+        }
+
+        .btn.lesson-btn {
+            background: linear-gradient(180deg, #a3d99b 0%, #6cbb5f 48%, #52a447 52%, #82c977 100%);
+            border-color: #3f8437;
+            color: #ffffff;
+            font-weight: 700;
+            text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+        }
+
+        .btn.lesson-btn:hover {
+            background: linear-gradient(180deg, #b0e0a8 0%, #75c368 48%, #59ac4e 52%, #8bd080 100%);
+        }
+
+        .btn:disabled {
+            color: #b0b0b0;
+            background: linear-gradient(180deg, #fafafa, #f1f1f1);
+            box-shadow: none;
+            cursor: default;
+        }
+
+        /* ------------------------------ stats ----------------------------- */
+
+        #stats-panel {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            width: 220px;
+            z-index: 100;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid var(--rule);
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--ink-soft);
+        }
+
+        .stat-value {
+            font-size: 12px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--blue-deep);
+            min-width: 50px;
+            text-align: center;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #eef4fb;
+            border: 1px solid #cddff0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --------------------------- info panel --------------------------- */
+
+        #info-panel {
+            position: absolute;
+            bottom: 18px;
+            left: 18px;
+            width: 352px;
+            z-index: 120;
+        }
+
+        #info-panel .win-body {
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+
+        .info-blurb {
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--ink-soft);
+            margin-bottom: 12px;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--ink);
+            text-decoration: none;
+            padding: 5px 12px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #ffffff, #f0f0f0);
+            border: 1px solid #c9c9c9;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), inset 0 1px 0 #ffffff;
+            transition: background 0.12s, box-shadow 0.12s;
+        }
+
+        .tag:hover {
+            background: linear-gradient(180deg, #ffffff, #e4e4e4);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 0 #ffffff;
+        }
+
+        .tag:active {
+            background: linear-gradient(180deg, #dcdcdc, #efefef);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .tag-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            flex: none;
+        }
+
+        .tag-hint {
+            font-size: 11px;
+            color: #9a9aa0;
+            margin-top: 12px;
+        }
+
+        /* ---------------------------- help panel -------------------------- */
+
+        #help-panel {
+            position: absolute;
+            top: 214px;
+            right: 18px;
+            width: 282px;
+            z-index: 120;
+        }
+
+        #help-panel h3 {
+            font-size: 13px;
+        }
+
+        #help-panel ul {
+            list-style: none;
+            font-size: 12px;
+            line-height: 1.85;
+            color: var(--ink);
+        }
+
+        #help-panel li {
+            padding-left: 15px;
+            text-indent: -15px;
+        }
+
+        #help-panel li::before {
+            content: "\25CF  ";
+            font-size: 8px;
+            color: var(--blue);
+            vertical-align: 2px;
+        }
+
+        /* --------------------------- map zoom ----------------------------- */
+
+        #zoom-control {
+            position: absolute;
+            right: 18px;
+            bottom: 18px;
+            z-index: 120;
+            display: flex;
+            flex-direction: column;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.22);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+        }
+
+        .zoom-btn {
+            width: 38px;
+            height: 36px;
+            border: none;
+            background: linear-gradient(180deg, #ffffff, #ededed);
+            color: #3a3a3f;
+            font-size: 19px;
+            font-weight: 600;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .zoom-btn:first-child {
+            border-bottom: 1px solid #cfcfcf;
+        }
+
+        .zoom-btn:hover {
+            background: linear-gradient(180deg, #ffffff, #e0e0e0);
+        }
+
+        .zoom-btn:active {
+            background: linear-gradient(180deg, #d4d4d4, #e9e9e9);
+        }
+
+        /* ----------------------------- compass ---------------------------- */
+
+        #compass {
+            position: absolute;
+            right: 18px;
+            bottom: 100px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 40%, #ffffff, #e9e9ec);
+            border: 1px solid rgba(0, 0, 0, 0.22);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22), inset 0 1px 0 #ffffff;
+            z-index: 120;
+        }
+
+        #compass::before,
+        #compass::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            background: #c9c9ce;
+        }
+
+        #compass::before { width: 44px; height: 1px; transform: translate(-50%, -50%); }
+        #compass::after { width: 1px; height: 44px; transform: translate(-50%, -50%); }
+
+        #compass-needle {
+            position: absolute;
+            inset: 0;
+            transition: transform 0.08s linear;
+            z-index: 1;
+        }
+
+        #compass-needle::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 9px;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 19px solid #e0443e;
+            transform: translateX(-50%);
+        }
+
+        #compass-needle::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: 9px;
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 19px solid #9a9aa0;
+            transform: translateX(-50%);
+        }
+
+        #compass-needle .north {
+            position: absolute;
+            left: 50%;
+            top: -1px;
+            transform: translateX(-50%);
+            font-size: 9px;
+            font-weight: 700;
+            color: #4b4b4b;
+        }
+
+        /* --------------------------- lesson modal ------------------------- */
+
+        #lesson-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(30, 38, 48, 0.42);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 800;
+            padding: 20px;
+        }
+
+        .lesson-content {
+            max-width: 680px;
+            width: 100%;
+            max-height: 88vh;
+            overflow-y: auto;
+        }
+
+        .lesson-content h2 {
+            font-size: 13px;
+        }
+
+        .lesson-progress {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--ink-soft);
+            margin-bottom: 14px;
+        }
+
+        .lesson-step h3 {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 12px;
+        }
+
+        .lesson-step p {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--ink);
+            background: var(--tint);
+            border: 1px solid var(--tint-line);
+            border-radius: 10px;
+            padding: 13px 15px;
+            margin-bottom: 14px;
+        }
+
+        .arabic-text {
+            direction: rtl;
+            text-align: right;
+            font-size: 15px;
+            line-height: 2;
+            font-family: "Geeza Pro", Tahoma, "Traditional Arabic", sans-serif;
+            color: var(--ink);
+            color: #4a3520;
+            color: var(--ink);
+            background: var(--tint);
+            border: 1px solid var(--tint-line);
+            border-right: 4px solid var(--accent-grey);
+            border-radius: 10px;
+            padding: 13px 15px;
+            margin-bottom: 14px;
+        }
+
+        .lesson-nav {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        /* ------------------------------ errors ---------------------------- */
+
+        #error-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #fdecea;
+            border-bottom: 1px solid #e0a5a0;
+            color: #7a2620;
+            padding: 10px 16px;
+            font-size: 12px;
+            z-index: 2000;
+            text-align: center;
+        }
+
+        /* ---------------------------- responsive -------------------------- */
+
+        @media (max-width: 900px) {
+            #info-panel {
+                width: calc(100% - 36px);
+            }
+
+            #help-panel {
+                width: calc(100% - 36px);
+                top: 18px;
+                right: 18px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #ui-controls {
+                width: 282px;
+            }
+
+            #stats-panel {
+                width: 186px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #ui-controls {
+                width: 258px;
+            }
+
+            .filter-btn {
+                padding: 4px 10px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Intro Screen -->
+    <div id="intro-screen">
+        <div class="intro-content panel">
+            <h1 class="title-bar"><span>Dubai Entrepreneurship Ecosystem</span></h1>
+            <div class="win-body">
+            <h2>Explore the 8 pillars of the entrepreneurship ecosystem inside Dubai on this interactive map of the UAE</h2>
+            <p class="intro-credit">This is a simulation by Ms. Sana Hamdan</p>
+            <div class="intro-actions">
+                <button id="start-button" class="btn primary">Start</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div id="main-container" style="display: none;">
+        <!-- 3D Scene Container -->
+        <div id="scene-container"></div>
+
+        <!-- Stats Panel -->
+        <div id="stats-panel" class="panel">
+            <div class="title-bar"><span>Statistics</span></div>
+            <div class="win-body">
+                <div class="stat-item">
+                    <span class="stat-label">Entities on Map</span>
+                    <span class="stat-value" id="total-entities">32</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Innovation Pillars</span>
+                    <span class="stat-value">8</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Active Filter</span>
+                    <span class="stat-value" id="active-filter">All</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Visible</span>
+                    <span class="stat-value" id="visible-count">32</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- UI Controls -->
+        <div id="ui-controls" class="panel">
+            <h2 class="title-bar"><span>Dubai Innovation Hub</span></h2>
+            <div class="win-body">
+                <p class="byline">This is a simulation by Ms. Sana Hamdan</p>
+                <h3>Filter by Innovation Pillar</h3>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-pillar="all">All Pillars</button>
+                    <button class="filter-btn" data-pillar="markets">Markets</button>
+                    <button class="filter-btn" data-pillar="workforce">Workforce</button>
+                    <button class="filter-btn" data-pillar="funding">Funding</button>
+                    <button class="filter-btn" data-pillar="support">Support</button>
+                    <button class="filter-btn" data-pillar="regulatory">Regulatory</button>
+                    <button class="filter-btn" data-pillar="education">Education</button>
+                    <button class="filter-btn" data-pillar="universities">Universities</button>
+                    <button class="filter-btn" data-pillar="culture">Culture</button>
+                </div>
+                <div class="control-buttons">
+                    <button id="reset-view" class="btn">Reset View</button>
+                    <button id="toggle-help" class="btn">Help</button>
+                    <button id="start-lesson" class="btn lesson-btn">Start Lesson</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Category Panel -->
+        <div id="info-panel" class="panel hidden">
+            <div class="title-bar">
+                <span id="info-title">Category</span>
+                <button class="panel-close" id="close-info" aria-label="Close">X</button>
+            </div>
+            <div class="win-body">
+                <p class="info-blurb" id="info-blurb"></p>
+                <div class="tag-list" id="info-tags"></div>
+                <p class="tag-hint"><span id="info-count"></span>. Click a name to open its website.</p>
+            </div>
+        </div>
+
+        <!-- Help Panel -->
+        <div id="help-panel" class="panel hidden">
+            <h3 class="title-bar">
+                <span>How to use this map</span>
+                <button class="panel-close" id="close-help" aria-label="Close">X</button>
+            </h3>
+            <div class="win-body">
+                <ul>
+                    <li>Drag to orbit the camera</li>
+                    <li>Scroll or pinch to zoom</li>
+                    <li>Click a cluster to list its organisations</li>
+                    <li>Click a name in the list to open its website</li>
+                    <li>Use the filters to isolate one pillar</li>
+                    <li>Reset View returns the camera home</li>
+                    <li>Start Lesson opens the bilingual briefing</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Compass -->
+        <div id="compass" title="North">
+            <div id="compass-needle"><span class="north">N</span></div>
+        </div>
+
+        <!-- Map Zoom -->
+        <div id="zoom-control">
+            <button id="zoom-in" class="zoom-btn" aria-label="Zoom in">+</button>
+            <button id="zoom-out" class="zoom-btn" aria-label="Zoom out">&#8722;</button>
+        </div>
+    </div>
+
+    <!-- Lesson Modal -->
+    <div id="lesson-modal" class="hidden">
+        <div class="lesson-content panel">
+            <h2 class="title-bar">
+                <span>What is an entrepreneurship ecosystem?</span>
+                <button class="panel-close" id="close-lesson" aria-label="Close">X</button>
+            </h2>
+            <div class="win-body">
+                <p class="lesson-progress" id="lesson-progress">Step 1 of 4</p>
+                <div class="lesson-step" id="lesson-step"></div>
+                <div class="lesson-nav">
+                    <button class="btn secondary" id="lesson-prev">Back</button>
+                    <button class="btn primary" id="lesson-next">Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<script>
+(function () {
+    'use strict';
+
+    /* ------------------------------------------------------------------
+       UAE Innovation Ecosystem
+       Interactive 3D map. Teaching artifact by Ms. Sana Hamdan.
+       Three.js r128. No OrbitControls, no CapsuleGeometry, no canvas
+       roundRect, no browser storage. Camera controls are hand written.
+       ------------------------------------------------------------------ */
+
+    var THREE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+
+    /* ----------------------------- data ------------------------------ */
+
+    var pillarNames = {
+        markets: 'Markets',
+        workforce: 'Workforce',
+        funding: 'Funding',
+        support: 'Support',
+        regulatory: 'Regulatory',
+        education: 'Education',
+        universities: 'Universities',
+        culture: 'Culture'
+    };
+
+    var pillarBlurbs = {
+        markets: 'Where a founder reaches customers: chambers, trade platforms and commercial clusters.',
+        workforce: 'Where talent is clustered, trained and hired.',
+        funding: 'Capital: grants, guarantees, venture funds and development banks.',
+        support: 'Incubators, accelerators and agencies that help a company get off the ground.',
+        regulatory: 'Licensing, courts, permits and the rules a business operates under.',
+        education: 'Regulators and institutions that build the skills pipeline.',
+        universities: 'Degree granting institutions and their enterprise programmes.',
+        culture: 'The districts, authorities and events that make innovation visible and normal.'
+    };
+
+    // Every entry is a real organisation. Links were checked against the
+    // organisation or its government parent, so spot check before class.
+    var ecosystemData = {
+        dubai: {
+            name: 'Dubai',
+            pillars: {
+                markets: [
+                    { name: 'Dubai Chamber of Commerce', url: 'https://www.dubaichamber.com', note: 'Private sector body, trade missions, Dubai Startup Hub' },
+                    { name: 'Dubai World Trade Centre', url: 'https://www.dwtc.com', note: 'GITEX, Gulfood and the exhibition calendar' },
+                    { name: 'DMCC', url: 'https://www.dmcc.ae', note: 'Commodities free zone, Crypto Centre, Gaming Centre' },
+                    { name: 'Expo City Dubai', url: 'https://www.expocitydubai.com', note: 'Mixed use district on the Expo 2020 site' }
+                ],
+                workforce: [
+                    { name: 'Dubai Knowledge Park', url: 'https://dkp.ae', note: 'Free zone for HR, recruitment and training providers' },
+                    { name: 'Dubai Internet City', url: 'https://dic.ae', note: 'Technology cluster and enterprise talent pool' },
+                    { name: 'Dubai Media City', url: 'https://dmc.ae', note: 'Media, agencies and creative talent' },
+                    { name: 'MBR School of Government', url: 'https://www.mbrsg.ae', note: 'Public policy school and governance research' }
+                ],
+                funding: [
+                    { name: 'MBR Innovation Fund', url: 'https://www.mbrif.ae', note: 'Federal loan guarantee scheme and accelerator' },
+                    { name: 'DIFC Innovation Hub', url: 'https://www.difc.com/ecosystem/innovation-hub', note: 'FinTech Hive accelerator and bank pilots' },
+                    { name: 'Emirates Development Bank', url: 'https://www.edb.gov.ae', note: 'Federal lending into priority sectors' },
+                    { name: 'Dubai Future District Fund', url: 'https://www.dfdf.vc', note: 'Evergreen fund of funds and direct investor' }
+                ],
+                support: [
+                    { name: 'in5', url: 'https://www.in5.ae', note: 'TECOM incubator across tech, media and design' },
+                    { name: 'DTEC', url: 'https://dtec.ae', note: 'Largest startup campus in the region' },
+                    { name: 'Dubai SME', url: 'https://www.sme.ae', note: 'Incubation, Intilaq and government procurement access' },
+                    { name: 'Dubai Silicon Oasis Authority', url: 'https://www.dsoa.ae', note: 'Integrated technology park with labs and housing' }
+                ],
+                regulatory: [
+                    { name: 'Dubai Dept of Economy and Tourism', url: 'https://www.dubaidet.gov.ae', note: 'Mainland trade licences and Invest in Dubai' },
+                    { name: 'DIFC', url: 'https://www.difc.com', note: 'Common law jurisdiction with its own courts' },
+                    { name: 'Dubai Municipality', url: 'https://www.dm.gov.ae', note: 'Food, building and environmental permits' },
+                    { name: 'Ministry of Economy and Tourism', url: 'https://www.moet.gov.ae', note: 'Federal company law, IP and SME policy' }
+                ],
+                education: [
+                    { name: 'KHDA', url: 'https://www.khda.gov.ae', note: 'Licenses and inspects private education in Dubai' },
+                    { name: 'DIDI', url: 'https://www.didi.ac.ae', note: 'Design institute built on studio practice' },
+                    { name: 'Hamdan Bin Mohammed Smart University', url: 'https://www.hbmsu.ac.ae', note: 'Accredited fully online programmes' },
+                    { name: 'Dubai Future Foundation', url: 'https://www.dubaifuture.ae', note: 'Foresight, Future Labs and Future Academy' }
+                ],
+                universities: [
+                    { name: 'American University in the Emirates', url: 'https://www.aue.ae', note: 'Applied business focus in Academic City' },
+                    { name: 'Zayed University', url: 'https://www.zu.ac.ae', note: 'Federal university backing Emirati founders' },
+                    { name: 'RIT Dubai', url: 'https://www.rit.edu/dubai', note: 'US accredited engineering and computing' },
+                    { name: 'Heriot-Watt University Dubai', url: 'https://www.hw.ac.uk/dubai', note: 'Business, engineering and design in Knowledge Park' }
+                ],
+                culture: [
+                    { name: 'Area 2071', url: 'https://www.area2071.ae', note: 'Startups and government teams sharing a floor' },
+                    { name: 'Dubai Design District', url: 'https://www.dubaidesigndistrict.com', note: 'Design, fashion and Dubai Design Week' },
+                    { name: 'Dubai Culture and Arts Authority', url: 'https://www.dubaiculture.gov.ae', note: 'Heritage, libraries and creative sector permits' },
+                    { name: 'MBR Centre for Government Innovation', url: 'https://www.mbrcgi.gov.ae', note: 'Innovation Month and public sector accelerators' }
+                ]
+            }
+        },
+        abudhabi: {
+            name: 'Abu Dhabi',
+            pillars: {
+                markets: [
+                    { name: 'Abu Dhabi Chamber', url: 'https://www.abudhabichamber.ae', note: 'Private sector representation and trade services' },
+                    { name: 'ADNEC Group', url: 'https://www.adnec.ae', note: 'Exhibition and events venue for the capital' },
+                    { name: 'Abu Dhabi Investment Office', url: 'https://www.adio.ae', note: 'Investment attraction and the Innovation Programme' },
+                    { name: 'Abu Dhabi Securities Exchange', url: 'https://www.adx.ae', note: 'Public listing route for growth companies' }
+                ],
+                workforce: [
+                    { name: 'Masdar City', url: 'https://www.masdarcity.ae', note: 'Clean technology cluster and research campus' },
+                    { name: 'twofour54', url: 'https://www.twofour54.com', note: 'Media free zone and creative talent base' },
+                    { name: 'KEZAD Group', url: 'https://www.kezad.ae', note: 'Industrial zones, logistics and worker housing' },
+                    { name: 'ADVETI', url: 'https://www.adveti.ac.ae', note: 'Vocational education and technical training' }
+                ],
+                funding: [
+                    { name: 'Khalifa Fund', url: 'https://www.khalifafund.ae', note: 'Enterprise development finance for Emirati founders' },
+                    { name: 'Mubadala', url: 'https://www.mubadala.com', note: 'Sovereign investor and Hub71 backer' },
+                    { name: 'ADQ', url: 'https://www.adq.ae', note: 'Sovereign holding company investing across sectors' },
+                    { name: 'Sandooq Al Watan', url: 'https://www.sandooqalwatan.ae', note: 'Community fund backing Emirati projects' }
+                ],
+                support: [
+                    { name: 'Hub71', url: 'https://www.hub71.com', note: 'Abu Dhabi global tech ecosystem, based in ADGM' },
+                    { name: 'Startup Abu Dhabi', url: 'https://www.abudhabistartup.com', note: 'Directory of programmes and incentives' },
+                    { name: "Ma'an", url: 'https://www.maan.gov.ae', note: 'Social contribution authority and social incubator' }
+                ],
+                regulatory: [
+                    { name: 'ADGM', url: 'https://www.adgm.com', note: 'Common law financial centre with its own courts' },
+                    { name: 'Abu Dhabi Dept of Economic Development', url: 'https://added.gov.ae', note: 'Mainland licensing and economic policy' },
+                    { name: 'Dept of Municipalities and Transport', url: 'https://www.dmt.gov.ae', note: 'Permits, land use and transport approvals' }
+                ],
+                education: [
+                    { name: 'ADEK', url: 'https://www.adek.gov.ae', note: 'Education regulator for the emirate' },
+                    { name: 'Technology Innovation Institute', url: 'https://www.tii.ae', note: 'Applied research across AI, quantum and robotics' },
+                    { name: 'Advanced Technology Research Council', url: 'https://atrc.ae', note: 'Sets the emirate research and development agenda' }
+                ],
+                universities: [
+                    { name: 'Khalifa University', url: 'https://www.ku.ac.ae', note: 'Research university with a startup incubator' },
+                    { name: 'NYU Abu Dhabi', url: 'https://nyuad.nyu.edu', note: 'Liberal arts and research campus on Saadiyat' },
+                    { name: 'UAE University', url: 'https://www.uaeu.ac.ae', note: 'The oldest national university, based in Al Ain' },
+                    { name: 'Sorbonne University Abu Dhabi', url: 'https://www.sorbonne.ae', note: 'French curriculum campus in the capital' }
+                ],
+                culture: [
+                    { name: 'Dept of Culture and Tourism', url: 'https://www.abudhabiculture.ae', note: 'Culture strategy and creative industries' },
+                    { name: 'Louvre Abu Dhabi', url: 'https://www.louvreabudhabi.ae', note: 'Anchor of the Saadiyat cultural district' }
+                ]
+            }
+        },
+        sharjah: {
+            name: 'Sharjah',
+            pillars: {
+                markets: [
+                    { name: 'Sharjah Chamber of Commerce', url: 'https://www.sharjahchamber.ae', note: 'Represents more than 60,000 SMEs' },
+                    { name: 'Expo Centre Sharjah', url: 'https://www.expo-centre.ae', note: 'Trade fairs and buyer access' },
+                    { name: 'Invest in Sharjah', url: 'https://www.investinsharjah.ae', note: 'Investment promotion for the emirate' }
+                ],
+                workforce: [
+                    { name: 'Sharjah Media City', url: 'https://www.shams.ae', note: 'Media free zone for creators and freelancers' },
+                    { name: 'Sharjah Publishing City', url: 'https://spcfz.com', note: 'Publishing and print industry cluster' },
+                    { name: 'Hamriyah Free Zone', url: 'https://www.hfza.ae', note: 'Industrial and manufacturing workforce base' },
+                    { name: 'SAIF Zone', url: 'https://www.saif-zone.com', note: 'Airport free zone for logistics and light industry' }
+                ],
+                support: [
+                    { name: 'Sheraa', url: 'https://www.sheraa.ae', note: 'Sharjah Entrepreneurship Center, incubation to scale' },
+                    { name: 'SRTIP', url: 'https://www.srtip.ae', note: 'Research, technology and innovation park' }
+                ],
+                regulatory: [
+                    { name: 'Sharjah Economic Development Dept', url: 'https://www.sedd.ae', note: 'Licensing and commercial regulation' },
+                    { name: 'Sharjah Municipality', url: 'https://portal.shjmun.gov.ae', note: 'Permits, inspection and public health' }
+                ],
+                universities: [
+                    { name: 'American University of Sharjah', url: 'https://www.aus.edu', note: 'Hosts a Sheraa campus hub' },
+                    { name: 'University of Sharjah', url: 'https://www.sharjah.ac.ae', note: 'Largest university in the emirate, second Sheraa hub' }
+                ],
+                culture: [
+                    { name: 'Sharjah Art Foundation', url: 'https://www.sharjahart.org', note: 'Sharjah Biennial and year round programming' },
+                    { name: 'Sharjah Book Authority', url: 'https://www.sba.gov.ae', note: 'Sharjah International Book Fair and publishing policy' },
+                    { name: 'Sharjah Museums Authority', url: 'https://www.sharjahmuseums.ae', note: 'Sixteen museums across the emirate' }
+                ]
+            }
+        },
+        ajman: {
+            name: 'Ajman',
+            pillars: {
+                markets: [
+                    { name: 'Ajman Chamber of Commerce', url: 'https://www.ajmanchamber.ae', note: 'Business representation and trade services' }
+                ],
+                support: [
+                    { name: 'Ajman Free Zone', url: 'https://afz.gov.ae', note: 'Low cost licensing since 1988' },
+                    { name: 'Free Zones Authority of Ajman', url: 'https://fza.ae', note: 'Runs AFZ, Ajman Media City and Al Zorah' }
+                ],
+                regulatory: [
+                    { name: 'Ajman Government', url: 'https://www.ajman.ae', note: 'Licensing and government services portal' }
+                ],
+                universities: [
+                    { name: 'Ajman University', url: 'https://www.ajman.ac.ae', note: 'Private university with an innovation centre' },
+                    { name: 'Gulf Medical University', url: 'https://www.gmu.ac.ae', note: 'Health sciences and clinical research' }
+                ],
+                culture: [
+                    { name: 'Ajman Tourism Development Dept', url: 'https://www.ajmantourism.ae', note: 'Heritage sites, events and creative tourism' }
+                ]
+            }
+        },
+        umm: {
+            name: 'Umm Al Quwain',
+            pillars: {
+                markets: [
+                    { name: 'Umm Al Quwain Chamber', url: 'https://www.uaqchamber.ae', note: 'Chamber of commerce and industry' }
+                ],
+                support: [
+                    { name: 'UAQ Free Trade Zone', url: 'https://uaqftz.com', note: 'Low cost licences for freelancers and small traders' }
+                ],
+                regulatory: [
+                    { name: 'Umm Al Quwain Government', url: 'https://www.uaq.ae', note: 'Emirate services and economic department' }
+                ]
+            }
+        },
+        rak: {
+            name: 'Ras Al Khaimah',
+            pillars: {
+                markets: [
+                    { name: 'RAK Chamber of Commerce', url: 'https://www.rakchamber.ae', note: 'Trade services and business representation' },
+                    { name: 'RAK ICC', url: 'https://www.rakicc.com', note: 'International corporate registry' }
+                ],
+                support: [
+                    { name: 'RAKEZ', url: 'https://rakez.com', note: 'Economic zone serving more than 14,000 companies' },
+                    { name: 'RAK SME', url: 'https://www.raksme.ae', note: 'Support agency for small and medium enterprises' }
+                ],
+                regulatory: [
+                    { name: 'RAK Government', url: 'https://www.rak.ae', note: 'Economic department and licensing' }
+                ],
+                universities: [
+                    { name: 'American University of Ras Al Khaimah', url: 'https://aurak.ac.ae', note: 'Engineering, business and applied research' },
+                    { name: 'RAK Medical and Health Sciences University', url: 'https://www.rakmhsu.ac.ae', note: 'Health sciences campus' }
+                ],
+                culture: [
+                    { name: 'RAK Tourism Development Authority', url: 'https://raktda.com', note: 'Adventure tourism and destination branding' },
+                    { name: 'Al Qasimi Foundation', url: 'https://www.alqasimifoundation.com', note: 'Policy research and education grants' }
+                ]
+            }
+        },
+        fujairah: {
+            name: 'Fujairah',
+            pillars: {
+                markets: [
+                    { name: 'Fujairah Chamber of Commerce', url: 'https://www.fujcci.ae', note: 'Trade services on the east coast' }
+                ],
+                support: [
+                    { name: 'Fujairah Free Zone', url: 'https://freezone.fujairah.ae', note: 'Port linked zone for traders and industry' },
+                    { name: 'Creative City Fujairah', url: 'https://creativecity.gov.ae', note: 'Media free zone for creators and consultants' }
+                ],
+                regulatory: [
+                    { name: 'Fujairah Government', url: 'https://www.fujairah.ae', note: 'Industry and economy department' }
+                ],
+                universities: [
+                    { name: 'University of Fujairah', url: 'https://www.uof.ac.ae', note: 'Business, IT and engineering programmes' }
+                ],
+                culture: [
+                    { name: 'Fujairah Tourism and Antiquities', url: 'https://www.fujairahtourism.ae', note: 'Forts, heritage sites and cultural events' }
+                ]
+            }
+        }
+    };
+
+    var lessonSteps = [
+        {
+            heading: 'Definition and Core Concept',
+            english: 'An entrepreneurship ecosystem is the set of people, organisations and rules in one place that together make it possible to start and grow a company. No single actor owns it. It includes markets, workforce, funding, support organisations, regulation, education, universities and culture. When these connect, a founder can move from idea to revenue without leaving the city.',
+            arabic: 'النظام البيئي لريادة الأعمال هو مجموعة الأفراد والمؤسسات والقوانين في مكان واحد، والتي تتيح معاً تأسيس الشركات ونموها. ولا يملكه طرف واحد. ويضم الأسواق والقوى العاملة والتمويل ومؤسسات الدعم والتشريعات والتعليم والجامعات والثقافة. وعندما تترابط هذه العناصر يستطيع رائد الأعمال الانتقال من الفكرة إلى الإيرادات دون مغادرة المدينة.'
+        },
+        {
+            heading: 'The Power of Synergy',
+            english: 'The value of an ecosystem comes from the connections, not the count. A city can hold funds, universities and free zones and still fail its founders if these never meet. Density and trust are what turn separate institutions into one system: a mentor who introduces an investor, a regulator who answers a founder call, a corporation that runs a pilot with a startup it met at an event.',
+            arabic: 'تنبع قيمة النظام البيئي من الروابط لا من العدد. فقد تمتلك المدينة صناديق تمويل وجامعات ومناطق حرة، ومع ذلك تخذل روّاد الأعمال إذا لم تلتقِ هذه الجهات. الكثافة والثقة هما ما يحوّل المؤسسات المنفصلة إلى نظام واحد: مرشد يقدّم مستثمراً، وجهة تنظيمية تجيب على اتصال رائد أعمال، وشركة كبرى تختبر حلاً مع شركة ناشئة التقتها في فعالية.'
+        },
+        {
+            heading: 'Scale and Global Examples',
+            english: 'Ecosystems work at the scale of a city or a district, not a country. Silicon Valley, Tel Aviv, Bangalore, Berlin and Shenzhen each grew from a specific local mix of research, capital and industry. The UAE holds seven of them at once, each with its own mix: Dubai is trade led, Abu Dhabi is capital led, Sharjah is education and culture led, and the northern emirates compete on cost and speed of setup.',
+            arabic: 'تعمل الأنظمة البيئية على مستوى المدينة أو الحي لا على مستوى الدولة. فقد نمت وادي السيليكون وتل أبيب وبنغالور وبرلين وشنجن من مزيج محلي محدد من البحث ورأس المال والصناعة. وتضم الإمارات سبعة أنظمة في آن واحد، لكل منها مزيجه الخاص: دبي تقودها التجارة، وأبوظبي يقودها رأس المال، والشارقة يقودها التعليم والثقافة، أما الإمارات الشمالية فتتنافس على الكلفة وسرعة التأسيس.'
+        },
+        {
+            heading: 'The Eight Innovation Pillars',
+            english: 'This map places eight pillars across the seven emirates: markets, workforce, funding, support, regulatory, education, universities and culture. Click any cluster to see the real organisations behind it, then open one directly. Use the filters to isolate a single pillar and compare emirates, and ask which pillar your own venture is weakest in. That gap is usually where your next month of work belongs.',
+            arabic: 'تضع هذه الخريطة ثماني ركائز موزعة على الإمارات السبع: الأسواق، والقوى العاملة، والتمويل، والدعم، والتشريعات، والتعليم، والجامعات، والثقافة. انقر على أي مجموعة لعرض المؤسسات الحقيقية التي تقف خلفها، ثم افتح أياً منها مباشرة. استخدم عوامل التصفية لعزل ركيزة واحدة ومقارنة الإمارات، ثم اسأل نفسك: أي ركيزة هي الأضعف في مشروعك؟ تلك الفجوة هي غالباً موضع عملك في الشهر المقبل.'
+        }
+    ];
+
+
+        var emirateData = {
+            abudhabi: { name: "Abu Dhabi", color: 0x32CD32, label: { x: -12.0, z: 37.4 }, rings: [[[58.84, -4.8], [61.96, -4.0], [64.0, -4.09], [64.6, -2.77], [64.72, -1.89], [63.6, -0.88], [63.36, 0.62], [62.8, 1.23], [62.4, 1.8], [62.44, 2.77], [62.96, 4.62], [62.84, 7.0], [63.0, 7.66], [64.04, 8.54], [64.44, 9.28], [64.28, 11.4], [64.04, 12.06], [62.48, 14.83], [62.16, 15.62], [62.24, 16.28], [62.72, 16.5], [65.2, 17.07], [65.88, 17.12], [68.12, 16.19], [69.32, 16.68], [69.96, 18.26], [70.44, 20.15], [71.92, 22.84], [71.48, 23.54], [68.96, 24.16], [64.28, 26.09], [63.52, 25.96], [62.48, 25.17], [61.76, 25.3], [61.12, 25.52], [59.2, 25.34], [57.88, 25.3], [56.72, 25.52], [55.64, 25.96], [53.68, 27.06], [52.0, 27.68], [50.28, 28.03], [50.12, 28.64], [51.12, 30.05], [52.6, 30.93], [53.24, 31.9], [53.4, 33.18], [53.52, 36.52], [53.36, 37.09], [51.48, 39.91], [51.12, 40.66], [49.8, 46.11], [49.24, 46.95], [47.76, 48.62], [47.0, 49.76], [46.56, 51.22], [45.72, 55.62], [44.84, 58.3], [41.04, 65.08], [39.8, 69.3], [39.64, 70.62], [39.92, 77.04], [39.48, 83.42], [36.8, 86.99], [36.2, 87.08], [19.6, 84.83], [2.92, 82.59], [-13.76, 80.3], [-30.44, 78.06], [-47.12, 75.81], [-64.68, 73.44], [-66.48, 72.38], [-74.88, 61.42], [-83.2, 50.47], [-91.56, 39.56], [-99.92, 28.64], [-104.24, 22.97], [-105.08, 20.77], [-105.0, 17.95], [-105.24, 15.14], [-104.36, 13.9], [-104.32, 11.92], [-105.04, 10.38], [-104.24, 9.46], [-103.04, 11.48], [-102.88, 14.87], [-102.04, 16.76], [-101.08, 14.17], [-100.16, 16.54], [-99.04, 16.37], [-98.4, 14.17], [-97.64, 13.6], [-96.84, 14.87], [-96.72, 15.84], [-97.12, 18.66], [-96.56, 21.82], [-96.56, 23.8], [-95.64, 26.36], [-94.68, 26.62], [-92.24, 26.84], [-91.2, 27.72], [-90.56, 27.94], [-90.76, 26.93], [-89.88, 26.8], [-87.32, 26.84], [-85.32, 28.03], [-83.28, 27.68], [-81.16, 27.59], [-78.36, 27.28], [-76.16, 26.22], [-73.88, 25.7], [-72.32, 24.55], [-70.24, 23.63], [-68.52, 22.13], [-66.72, 20.59], [-65.0, 19.71], [-64.88, 18.17], [-64.0, 17.16], [-62.64, 18.04], [-61.2, 20.02], [-60.12, 19.71], [-57.56, 20.2], [-55.32, 19.84], [-53.52, 20.02], [-49.72, 20.24], [-48.12, 19.54], [-47.56, 19.23], [-46.04, 20.68], [-43.72, 20.33], [-41.48, 20.9], [-42.32, 19.1], [-40.32, 19.4], [-38.16, 21.82], [-35.64, 22.18], [-30.52, 21.12], [-28.88, 22.26], [-27.24, 22.13], [-25.04, 24.02], [-22.84, 23.89], [-20.48, 23.67], [-18.72, 23.63], [-13.84, 23.32], [-8.0, 20.68], [-2.8, 16.72], [2.0, 13.2], [5.2, 7.92], [6.8, 5.72], [10.0, 3.52], [14.4, 2.2], [18.0, -2.64], [20.8, -6.16], [24.8, -8.8], [28.8, -12.32], [32.6, -15.84], [37.52, -1.63], [37.92, -0.79], [38.4, -0.13], [39.2, 0.13], [40.04, 0.22], [48.48, -0.13], [49.6, -0.35], [50.8, -0.84], [53.52, -2.38], [57.92, -4.18]]] },
+            dubai: { name: "Dubai", color: 0xFFD700, label: { x: 40.0, z: -9.68 }, rings: [[[45.0, -31.11], [47.12, -30.49], [48.24, -30.54], [49.6, -31.02], [49.96, -31.11], [50.2, -30.89], [50.96, -29.96], [52.56, -29.0], [53.16, -28.34], [56.04, -26.4], [56.68, -25.74], [57.16, -24.82], [58.32, -20.02], [58.24, -19.45], [57.88, -18.92], [57.36, -18.48], [57.04, -18.08], [56.8, -17.6], [57.08, -16.54], [57.8, -15.14], [58.24, -13.9], [58.44, -12.98], [58.44, -11.97], [58.56, -10.65], [59.04, -8.84], [59.24, -6.69], [59.12, -5.63], [58.84, -4.8], [57.92, -4.18], [53.52, -2.38], [50.8, -0.84], [49.6, -0.35], [48.48, -0.13], [40.04, 0.22], [39.2, 0.13], [38.4, -0.13], [37.92, -0.79], [37.52, -1.63], [32.6, -15.84], [32.24, -16.28], [32.56, -16.46], [32.88, -16.68], [34.0, -17.29], [33.8, -18.22], [35.12, -18.48], [35.28, -18.35], [38.28, -21.87], [42.36, -27.06], [42.56, -27.76], [42.52, -28.38], [43.28, -29.08], [43.92, -28.95], [44.52, -28.12], [44.72, -27.5], [44.56, -26.93], [44.04, -26.14], [45.16, -26.44], [45.36, -27.24], [45.08, -28.2], [44.24, -29.7], [44.16, -30.05], [44.36, -30.45]], [[76.24, -9.68], [78.84, -9.86], [78.2, -8.23], [77.32, -7.17], [77.08, -6.42], [76.72, -5.94], [75.96, -5.76], [75.12, -5.72], [75.08, -6.07], [75.04, -6.69], [75.28, -7.57]]] },
+            sharjah: { name: "Sharjah", color: 0xFF6347, label: { x: 64.0, z: -19.8 }, rings: [[[71.08, -30.01], [71.56, -28.69], [71.44, -27.5], [71.0, -26.88], [70.08, -25.83], [70.28, -25.17], [71.0, -24.29], [71.16, -23.8], [70.04, -21.3], [69.96, -20.2], [70.12, -19.1], [70.84, -17.73], [71.08, -16.81], [71.04, -16.37], [69.4, -16.63], [67.88, -16.24], [66.32, -15.18], [65.16, -14.12], [63.96, -12.58], [63.56, -11.22], [63.88, -7.83], [63.88, -7.04], [63.72, -5.37], [64.0, -4.09], [63.6, -4.0], [61.96, -4.0], [58.84, -4.8], [59.12, -5.63], [59.24, -6.69], [59.04, -8.84], [58.56, -10.65], [58.44, -11.97], [58.44, -12.98], [58.24, -13.9], [57.8, -15.14], [57.08, -16.54], [56.8, -17.56], [57.04, -18.08], [57.36, -18.48], [57.88, -18.92], [58.24, -19.45], [58.32, -20.02], [57.16, -24.82], [56.68, -25.74], [56.04, -26.4], [53.16, -28.34], [52.56, -29.0], [50.96, -29.96], [50.2, -30.89], [49.96, -31.11], [49.6, -31.02], [48.24, -30.54], [47.12, -30.49], [45.08, -31.06], [45.0, -31.11], [45.56, -31.72], [45.92, -31.9], [46.52, -31.86], [46.36, -32.43], [46.36, -32.96], [46.6, -33.4], [47.08, -33.66], [47.48, -33.31], [48.28, -34.01], [48.96, -34.98], [49.92, -34.36], [51.12, -33.92], [52.52, -33.62], [55.88, -33.44], [56.4, -33.66], [56.76, -34.32], [57.28, -35.77], [56.72, -36.17], [54.28, -36.61], [53.24, -37.18], [52.2, -37.49], [51.68, -37.84], [51.84, -38.1], [52.28, -38.5], [51.76, -38.76], [52.0, -39.29], [52.52, -40.0], [52.6, -40.17], [52.72, -40.13], [55.36, -38.5], [56.56, -37.49], [57.04, -37.14], [59.84, -35.99], [60.6, -35.46], [62.44, -33.84], [62.96, -33.26], [63.28, -32.74], [63.56, -31.59], [63.96, -30.67], [64.52, -29.96], [65.4, -29.79], [66.52, -29.92], [67.28, -30.27], [68.16, -30.58], [68.52, -31.02], [68.56, -31.33], [68.4, -32.12], [68.2, -32.65], [68.4, -32.91], [69.12, -32.91], [69.76, -31.94], [70.32, -33.09], [70.64, -34.54], [71.2, -34.76], [72.04, -34.36], [71.32, -32.21], [70.88, -31.86], [70.6, -31.33], [70.6, -31.11]], [[87.32, -31.72], [86.24, -30.93], [85.96, -30.54], [84.36, -30.84], [83.64, -32.03], [82.44, -32.16], [82.56, -32.47], [82.88, -33.4], [83.32, -33.75], [84.8, -34.67], [86.4, -36.12], [86.6, -36.21], [86.72, -35.02], [86.36, -34.14], [86.8, -33.04], [87.16, -32.34]], [[78.56, -19.93], [79.28, -19.62], [82.16, -16.59], [82.8, -14.92], [83.28, -15.44], [83.6, -16.68], [84.08, -17.25], [84.28, -18.22], [84.12, -18.66], [83.84, -19.8], [83.6, -20.46], [83.44, -21.03], [84.16, -21.12], [86.48, -20.59], [86.48, -20.11], [87.32, -16.63], [85.16, -16.41], [84.76, -15.97], [84.64, -14.52], [84.56, -13.73], [84.28, -13.6], [82.36, -13.86], [82.12, -12.98], [80.16, -13.24], [79.44, -13.68], [79.24, -14.21], [79.32, -15.09], [79.56, -15.8], [79.4, -16.68], [78.88, -17.91], [78.08, -19.18], [78.12, -19.67]]] },
+            ajman: { name: "Ajman", color: 0x9370DB, label: { x: 54.0, z: -35.2 }, rings: [[[48.96, -34.98], [49.48, -35.42], [50.2, -36.08], [50.8, -36.61], [51.28, -37.18], [51.68, -37.84], [52.2, -37.49], [53.24, -37.18], [54.28, -36.61], [56.72, -36.17], [57.28, -35.77], [56.76, -34.32], [56.4, -33.66], [55.88, -33.44], [52.52, -33.62], [51.12, -33.92], [49.92, -34.36]]] },
+            umm: { name: "Umm Al Quwain", color: 0x00BFFF, label: { x: 60.8, z: -40.92 }, rings: [[[52.6, -40.17], [53.6, -41.36], [54.6, -42.24], [56.0, -42.9], [57.6, -43.56], [59.6, -44.88], [60.8, -45.98], [61.88, -46.68], [62.84, -45.8], [63.56, -45.67], [64.08, -45.14], [65.16, -41.62], [65.4, -40.0], [65.36, -39.56], [65.52, -38.98], [65.8, -38.46], [67.28, -36.83], [67.56, -36.39], [67.52, -35.95], [67.16, -35.29], [67.24, -34.94], [68.28, -33.92], [69.12, -32.91], [68.4, -32.91], [68.2, -32.65], [68.4, -32.12], [68.56, -31.33], [68.52, -31.02], [68.16, -30.58], [67.28, -30.27], [66.52, -29.92], [65.4, -29.79], [64.52, -29.96], [63.96, -30.67], [63.56, -31.59], [63.28, -32.74], [62.96, -33.26], [62.44, -33.84], [60.6, -35.46], [59.84, -35.99], [57.04, -37.14], [56.56, -37.49], [55.36, -38.5], [52.72, -40.13]]] },
+            rak: { name: "Ras Al Khaimah", color: 0xFF1493, label: { x: 72.8, z: -54.12 }, rings: [[[78.08, -46.55], [77.56, -46.2], [75.88, -45.72], [74.56, -45.76], [73.88, -45.28], [72.88, -44.22], [72.44, -43.96], [71.84, -43.87], [71.12, -43.87], [70.8, -43.6], [70.64, -42.99], [70.84, -42.06], [71.16, -40.3], [71.32, -39.42], [71.56, -39.2], [72.48, -38.94], [73.68, -39.07], [74.56, -39.03], [75.04, -39.2], [75.56, -39.6], [76.16, -39.6], [76.36, -39.42], [76.88, -38.72], [77.12, -38.1], [76.76, -37.31], [75.8, -36.26], [75.68, -35.99], [75.96, -35.38], [76.32, -35.2], [76.92, -35.29], [77.4, -34.89], [77.48, -33.97], [77.32, -33.66], [76.92, -33.53], [76.44, -33.09], [75.88, -32.69], [75.08, -32.69], [73.12, -33.26], [72.52, -33.92], [72.04, -34.36], [71.2, -34.76], [70.64, -34.54], [70.32, -33.09], [69.76, -31.94], [69.12, -32.91], [68.28, -33.92], [67.24, -34.94], [67.16, -35.29], [67.52, -35.95], [67.56, -36.39], [67.28, -36.83], [65.8, -38.46], [65.52, -38.98], [65.36, -39.56], [65.4, -40.0], [65.16, -41.62], [64.08, -45.14], [63.56, -45.67], [62.84, -45.8], [61.88, -46.68], [62.4, -47.52], [63.2, -47.87], [64.12, -48.27], [64.52, -48.71], [65.68, -49.02], [67.12, -50.16], [69.28, -52.93], [70.4, -53.86], [70.16, -53.46], [69.48, -51.79], [70.08, -51.57], [70.56, -53.46], [70.88, -54.69], [72.56, -56.28], [73.24, -57.24], [73.64, -58.7], [73.36, -58.7], [72.68, -57.64], [72.32, -57.51], [73.36, -59.22], [74.2, -61.12], [74.92, -63.89], [75.08, -64.28], [76.04, -64.37], [78.04, -64.9], [78.52, -64.86], [79.12, -63.14], [79.32, -62.26], [79.24, -61.42], [79.0, -60.15], [78.84, -56.19], [78.56, -55.53], [77.8, -54.47], [77.6, -53.81], [77.76, -53.06], [78.68, -51.83], [78.88, -51.26], [78.6, -50.69], [77.64, -49.85], [77.6, -49.1], [77.8, -47.12], [78.04, -46.6]], [[80.28, -27.59], [79.76, -27.37], [78.64, -27.28], [78.4, -27.1], [78.36, -26.8], [78.6, -25.87], [78.6, -24.9], [78.12, -22.13], [78.16, -21.21], [78.4, -20.55], [78.56, -19.93], [78.12, -19.67], [78.08, -19.18], [78.88, -17.91], [79.4, -16.68], [79.56, -15.8], [79.32, -15.09], [79.24, -14.21], [79.44, -13.68], [80.16, -13.24], [82.12, -12.98], [82.8, -12.45], [83.0, -11.97], [81.68, -10.65], [80.96, -10.3], [79.44, -10.12], [78.84, -9.86], [76.24, -9.68], [74.04, -11.7], [73.0, -12.45], [72.68, -14.39], [72.24, -15.66], [71.12, -16.37], [71.08, -16.81], [70.84, -17.73], [70.12, -19.1], [69.96, -20.2], [70.04, -21.3], [70.92, -23.45], [71.16, -23.8], [71.0, -24.29], [70.28, -25.17], [70.08, -25.83], [70.44, -26.44], [71.0, -26.88], [71.44, -27.5], [72.96, -27.41], [73.56, -27.24], [74.4, -27.32], [75.16, -27.46], [76.36, -27.19], [76.76, -27.24], [77.24, -27.72], [77.68, -28.16], [77.6, -28.64], [77.84, -29.26], [78.76, -29.96], [79.2, -30.54], [79.12, -30.67], [78.28, -30.67], [77.88, -31.06], [77.24, -31.11], [77.16, -31.42], [78.04, -32.21], [78.52, -32.34], [79.8, -31.99], [79.96, -31.81], [79.88, -31.28], [80.24, -31.15], [81.36, -31.37], [81.44, -30.62], [81.8, -29.83], [81.4, -29.35], [80.32, -28.82], [80.24, -27.76]]] },
+            fujairah: { name: "Fujairah", color: 0x228B22, label: { x: 80.0, z: -41.8 }, rings: [[[80.28, -27.59], [81.44, -26.88], [83.28, -28.03], [84.64, -28.73], [85.76, -29.35], [85.96, -30.54], [87.28, -31.72], [87.32, -31.37], [87.12, -30.05], [86.64, -26.8], [86.48, -20.59], [84.16, -21.12], [83.44, -21.03], [83.6, -20.46], [83.84, -19.8], [84.12, -18.66], [84.28, -18.22], [84.08, -17.25], [83.6, -16.68], [83.28, -15.44], [82.8, -14.92], [82.16, -16.59], [79.28, -19.62], [78.56, -19.93], [78.28, -20.86], [78.12, -22.13], [78.6, -24.9], [78.6, -25.87], [78.36, -26.8], [78.64, -27.28], [79.76, -27.37]], [[82.44, -32.16], [81.36, -31.37], [80.24, -31.15], [79.88, -31.28], [79.96, -31.81], [79.8, -31.99], [78.52, -32.34], [78.04, -32.21], [77.16, -31.42], [77.24, -31.11], [77.88, -31.06], [78.28, -30.67], [79.12, -30.67], [79.2, -30.54], [78.76, -29.96], [77.84, -29.26], [77.6, -28.64], [77.68, -28.16], [77.24, -27.72], [76.76, -27.24], [76.36, -27.19], [75.16, -27.46], [74.4, -27.32], [73.56, -27.24], [72.96, -27.41], [71.44, -27.5], [71.56, -28.69], [71.08, -30.01], [72.12, -30.84], [72.28, -31.33], [72.12, -31.77], [71.32, -32.21], [72.04, -34.36], [72.52, -33.92], [73.12, -33.26], [75.08, -32.69], [75.88, -32.69], [76.44, -33.09], [76.92, -33.53], [77.48, -33.97], [77.4, -34.89], [76.92, -35.29], [76.32, -35.2], [75.96, -35.38], [75.68, -35.99], [75.8, -36.26], [76.76, -37.31], [77.12, -38.1], [76.88, -38.72], [76.36, -39.42], [75.84, -39.69], [75.56, -39.6], [75.04, -39.2], [74.56, -39.03], [73.68, -39.07], [72.48, -38.94], [71.56, -39.2], [71.32, -39.42], [71.16, -40.3], [70.84, -41.71], [70.64, -42.99], [70.8, -43.6], [71.12, -43.87], [71.84, -43.87], [72.44, -43.96], [72.88, -44.22], [73.88, -45.28], [74.56, -45.76], [75.88, -45.72], [77.56, -46.2], [78.08, -46.55], [79.2, -46.29], [79.56, -45.98], [79.96, -45.1], [80.24, -44.79], [80.88, -44.62], [81.52, -44.75], [83.16, -45.19], [84.0, -44.7], [84.92, -44.35], [85.6, -44.22], [85.92, -43.69], [86.8, -40.74], [86.56, -36.65], [86.6, -36.21], [86.4, -36.12], [84.8, -34.67], [83.32, -33.75], [82.88, -33.4], [82.68, -32.91], [82.56, -32.47]]] },
+        };
+
+        var pillarColors = {
+            markets: 0xFF6B6B,
+            workforce: 0x4ECDC4,
+            funding: 0xFFE66D,
+            support: 0x95E1D3,
+            regulatory: 0xA8E6CF,
+            education: 0xFFB3BA,
+            universities: 0xDDA0DD,
+            culture: 0xF0E68C,
+        };
+
+        var clusterLayout = [
+            { pillar: 'markets', emirate: 'dubai', x: 44.84, z: -21.81, radius: 1.85 },
+            { pillar: 'workforce', emirate: 'dubai', x: 47.54, z: -27.81, radius: 1.85 },
+            { pillar: 'funding', emirate: 'dubai', x: 49.34, z: -23.31, radius: 1.85 },
+            { pillar: 'support', emirate: 'dubai', x: 42.74, z: -17.91, radius: 1.85 },
+            { pillar: 'regulatory', emirate: 'dubai', x: 48.14, z: -18.81, radius: 1.85 },
+            { pillar: 'education', emirate: 'dubai', x: 53.24, z: -25.41, radius: 1.85 },
+            { pillar: 'universities', emirate: 'dubai', x: 52.64, z: -20.31, radius: 1.85 },
+            { pillar: 'culture', emirate: 'dubai', x: 38.24, z: -16.71, radius: 1.85 },
+            { pillar: 'markets', emirate: 'abudhabi', x: 14.16, z: 5.16, radius: 2.2 },
+            { pillar: 'workforce', emirate: 'abudhabi', x: 19.56, z: 4.56, radius: 2.2 },
+            { pillar: 'funding', emirate: 'abudhabi', x: 10.56, z: 9.36, radius: 2.2 },
+            { pillar: 'support', emirate: 'abudhabi', x: 17.16, z: 9.96, radius: 2.2 },
+            { pillar: 'regulatory', emirate: 'abudhabi', x: 20.16, z: -0.84, radius: 2.2 },
+            { pillar: 'education', emirate: 'abudhabi', x: 13.56, z: 14.16, radius: 2.2 },
+            { pillar: 'universities', emirate: 'abudhabi', x: 22.56, z: 9.36, radius: 2.2 },
+            { pillar: 'culture', emirate: 'abudhabi', x: 24.96, z: 3.96, radius: 2.2 },
+            { pillar: 'markets', emirate: 'sharjah', x: 53.4, z: -31.17, radius: 1.6 },
+            { pillar: 'workforce', emirate: 'sharjah', x: 56.7, z: -29.07, radius: 1.6 },
+            { pillar: 'support', emirate: 'sharjah', x: 58.2, z: -32.67, radius: 1.6 },
+            { pillar: 'regulatory', emirate: 'sharjah', x: 59.1, z: -25.77, radius: 1.6 },
+            { pillar: 'universities', emirate: 'sharjah', x: 60.6, z: -29.37, radius: 1.6 },
+            { pillar: 'culture', emirate: 'sharjah', x: 60.0, z: -21.87, radius: 1.6 },
+            { pillar: 'markets', emirate: 'ajman', x: 51.96, z: -35.74, radius: 0.5 },
+            { pillar: 'support', emirate: 'ajman', x: 52.86, z: -34.84, radius: 0.5 },
+            { pillar: 'regulatory', emirate: 'ajman', x: 53.16, z: -36.04, radius: 0.5 },
+            { pillar: 'universities', emirate: 'ajman', x: 50.76, z: -35.44, radius: 0.5 },
+            { pillar: 'culture', emirate: 'ajman', x: 54.06, z: -35.14, radius: 0.5 },
+            { pillar: 'markets', emirate: 'umm', x: 58.3, z: -40.98, radius: 1.1 },
+            { pillar: 'support', emirate: 'umm', x: 61.0, z: -40.98, radius: 1.1 },
+            { pillar: 'regulatory', emirate: 'umm', x: 58.6, z: -38.28, radius: 1.1 },
+            { pillar: 'markets', emirate: 'rak', x: 71.78, z: -48.7, radius: 1.5 },
+            { pillar: 'support', emirate: 'rak', x: 68.18, z: -47.2, radius: 1.5 },
+            { pillar: 'regulatory', emirate: 'rak', x: 73.88, z: -52.0, radius: 1.5 },
+            { pillar: 'universities', emirate: 'rak', x: 75.68, z: -48.7, radius: 1.5 },
+            { pillar: 'culture', emirate: 'rak', x: 74.78, z: -55.6, radius: 1.5 },
+            { pillar: 'markets', emirate: 'fujairah', x: 83.52, z: -24.52, radius: 1.25 },
+            { pillar: 'support', emirate: 'fujairah', x: 81.72, z: -21.82, radius: 1.25 },
+            { pillar: 'regulatory', emirate: 'fujairah', x: 80.52, z: -25.42, radius: 1.25 },
+            { pillar: 'universities', emirate: 'fujairah', x: 76.04, z: -29.15, radius: 1.25 },
+            { pillar: 'culture', emirate: 'fujairah', x: 81.14, z: -33.35, radius: 1.25 },
+        ];
+
+        var burjPosition = { x: 42.96, y: 1, z: -26.27 };
+        var mapHome = { x: 56.0, z: -25.5 };
+        var flagPositions = [{x: 44.0, z: -28.16}, {x: 46.4, z: -24.64}, {x: 41.6, z: -21.12}];
+        var palmPositions = [{x: 7.2, z: 7.04}, {x: 16.8, z: 2.2}, {x: 26.4, z: -8.8}, {x: -44.0, z: 20.68}, {x: -64.0, z: 19.36}, {x: -84.0, z: 30.8}, {x: -6.0, z: 19.36}, {x: 4.0, z: 11.0}, {x: 36.8, z: -19.8}, {x: 40.0, z: -23.76}, {x: 50.0, z: -6.6}, {x: 36.8, z: -8.8}, {x: 48.0, z: -33.44}, {x: 52.8, z: -38.28}, {x: 58.4, z: -43.12}, {x: 69.2, z: -49.72}, {x: 85.6, z: -28.16}, {x: 72.8, z: -44.88}, {x: 74.0, z: -59.4}];
+        var dunePositions = [{x: -40.0, z: 63.8}, {x: -14.0, z: 55.0}, {x: 8.0, z: 68.2}, {x: -56.0, z: 52.8}, {x: 28.0, z: 44.0}, {x: -28.0, z: 37.4}, {x: 16.0, z: 30.8}, {x: -72.0, z: 33.0}, {x: 44.0, z: 57.2}, {x: 52.0, z: 17.6}, {x: 34.0, z: 11.0}];
+        var windTowerPositions = [{x: 47.2, z: -33.44}, {x: 71.2, z: -51.48}, {x: 85.2, z: -22.88}, {x: 50.8, z: -29.92}];
+        var dhowPositions = [{x: 4.0, z: -6.6}, {x: 22.0, z: -22.0}, {x: 32.0, z: -30.8}, {x: 46.0, z: -39.6}, {x: 56.0, z: -48.4}, {x: -32.0, z: 4.4}, {x: -64.0, z: 2.2}, {x: 92.0, z: -35.2}, {x: 90.0, z: -15.4}];
+
+    /* --------------------------- module state ------------------------- */
+
+    var scene, camera, renderer, raycaster, pointer;
+    var clusterGroups = [];
+    var clickableMeshes = [];
+    var selectedGroup = null;
+    var hoveredGroup = null;
+    var boats = [];
+    var clouds = [];
+    var birds = [];
+    var startTime = 0;
+    var running = false;
+    var activePillar = 'all';
+    var view = { radius: 120, theta: 0.0, phi: 0.82, tx: 0, ty: 0, tz: 0 };
+    var HOME = { radius: 120, theta: 0.0, phi: 0.82, tx: 0, ty: 0, tz: 0 };
+    var lessonIndex = 0;
+
+    /* ----------------------------- helpers ---------------------------- */
+
+    function byId(id) { return document.getElementById(id); }
+
+    function hex(value) { return '#' + ('000000' + value.toString(16)).slice(-6); }
+
+    function entitiesFor(emirate, pillar) {
+        var record = ecosystemData[emirate];
+        if (!record || !record.pillars) { return []; }
+        return record.pillars[pillar] || [];
+    }
+
+    function totalEntities() {
+        var count = 0;
+        for (var key in ecosystemData) {
+            if (!Object.prototype.hasOwnProperty.call(ecosystemData, key)) { continue; }
+            var pillars = ecosystemData[key].pillars;
+            for (var p in pillars) {
+                if (Object.prototype.hasOwnProperty.call(pillars, p)) { count += pillars[p].length; }
+            }
+        }
+        return count;
+    }
+
+    function showError(message) {
+        if (byId('error-banner')) { return; }
+        var bar = document.createElement('div');
+        bar.id = 'error-banner';
+        bar.textContent = 'Something went wrong: ' + message;
+        document.body.appendChild(bar);
+    }
+
+    function makeLabelSprite(text, hexColor, scaleX) {
+        var canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Rounded plate drawn with arcTo, so no roundRect dependency.
+        function plate(x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        }
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        ctx.shadowBlur = 14;
+        ctx.shadowOffsetY = 5;
+        plate(12, 26, 488, 74, 22);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        plate(12, 26, 488, 74, 22);
+        ctx.clip();
+        ctx.fillStyle = hexColor;
+        ctx.fillRect(12, 26, 16, 74);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.fillRect(12, 26, 488, 26);
+        ctx.restore();
+
+        plate(12, 26, 488, 74, 22);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.font = 'bold 42px "Lucida Grande", "Helvetica Neue", Helvetica, Arial, sans-serif';
+        ctx.fillStyle = '#1d1d1f';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 264, 64);
+
+        var texture = new THREE.CanvasTexture(canvas);
+        var material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+        var sprite = new THREE.Sprite(material);
+        sprite.scale.set(scaleX, scaleX * 0.25, 1);
+        sprite.renderOrder = 10;
+        return sprite;
+    }
+
+    /* ------------------------- ground and land ------------------------ */
+
+    function createOcean() {
+        var geometry = new THREE.PlaneGeometry(1400, 1400);
+        var material = new THREE.MeshLambertMaterial({ color: 0x1c7ea8, transparent: true, opacity: 0.92 });
+        var ocean = new THREE.Mesh(geometry, material);
+        ocean.rotation.x = -Math.PI / 2;
+        ocean.position.y = -0.6;
+        ocean.receiveShadow = true;
+        scene.add(ocean);
+    }
+
+    // Ring vertices are world (x, z), projected from WGS84. The shape is built
+    // with z negated so that rotation.x = -PI/2 maps it back to world (x, y, z).
+    function createEmirate(info) {
+        var material = new THREE.MeshLambertMaterial({ color: info.color });
+        for (var r = 0; r < info.rings.length; r++) {
+            var verts = info.rings[r];
+            var shape = new THREE.Shape();
+            shape.moveTo(verts[0][0], -verts[0][1]);
+            for (var i = 1; i < verts.length; i++) {
+                shape.lineTo(verts[i][0], -verts[i][1]);
+            }
+            shape.closePath();
+            var geometry = new THREE.ExtrudeGeometry(shape, { depth: 1.2, bevelEnabled: false });
+            var mesh = new THREE.Mesh(geometry, material);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+
+            var outline = new THREE.LineSegments(
+                new THREE.EdgesGeometry(geometry, 20),
+                new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 })
+            );
+            outline.rotation.x = -Math.PI / 2;
+            outline.position.y = 0.02;
+            scene.add(outline);
+        }
+
+        var label = makeLabelSprite(info.name, '#3d8fe0', 12);
+        label.position.set(info.label.x, 5.5, info.label.z);
+        scene.add(label);
+    }
+
+    function createEmirates() {
+        for (var key in emirateData) {
+            if (Object.prototype.hasOwnProperty.call(emirateData, key)) {
+                createEmirate(emirateData[key]);
+            }
+        }
+    }
+
+    /* --------------------------- buildings ---------------------------- */
+
+    function windowBand(group, width, depth, y) {
+        var material = new THREE.MeshLambertMaterial({ color: 0x2b3a55 });
+        var front = new THREE.Mesh(new THREE.BoxGeometry(width * 0.82, 0.16, 0.04), material);
+        front.position.set(0, y, depth / 2 + 0.02);
+        group.add(front);
+        var back = new THREE.Mesh(new THREE.BoxGeometry(width * 0.82, 0.16, 0.04), material);
+        back.position.set(0, y, -depth / 2 - 0.02);
+        group.add(back);
+    }
+
+    // Eight archetypes, one per pillar, so a cluster reads as a set.
+    function createBuilding(pillar, color, height, scale) {
+        var group = new THREE.Group();
+        var body = new THREE.MeshLambertMaterial({ color: color });
+        var trim = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+        var mesh;
+
+        if (pillar === 'markets') {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1.1, height, 1.1), body);
+            mesh.position.y = height / 2;
+            group.add(mesh);
+            var vault = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 1.1, 12, 1, false, 0, Math.PI), trim);
+            vault.rotation.z = Math.PI / 2;
+            vault.rotation.y = Math.PI / 2;
+            vault.position.y = height;
+            group.add(vault);
+        } else if (pillar === 'workforce') {
+            var left = new THREE.Mesh(new THREE.BoxGeometry(0.5, height, 0.9), body);
+            left.position.set(-0.35, height / 2, 0);
+            group.add(left);
+            var right = new THREE.Mesh(new THREE.BoxGeometry(0.5, height * 0.78, 0.9), body);
+            right.position.set(0.35, height * 0.39, 0);
+            group.add(right);
+            var bridge = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.18, 0.5), trim);
+            bridge.position.y = height * 0.62;
+            group.add(bridge);
+        } else if (pillar === 'funding') {
+            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.68, height, 16), body);
+            mesh.position.y = height / 2;
+            group.add(mesh);
+            var dome = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), trim);
+            dome.position.y = height;
+            group.add(dome);
+        } else if (pillar === 'support') {
+            for (var t = 0; t < 3; t++) {
+                var w = 1.25 - t * 0.3;
+                var h = height / 3;
+                var tier = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), body);
+                tier.position.y = h / 2 + t * h;
+                group.add(tier);
+            }
+        } else if (pillar === 'regulatory') {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, height * 0.85, 0.9), body);
+            mesh.position.y = height * 0.425;
+            group.add(mesh);
+            for (var c = -1; c <= 1; c++) {
+                var column = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, height * 0.7, 8), trim);
+                column.position.set(c * 0.4, height * 0.35, 0.5);
+                group.add(column);
+            }
+            var pediment = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.4, 4), trim);
+            pediment.rotation.y = Math.PI / 4;
+            pediment.position.y = height * 0.85 + 0.2;
+            group.add(pediment);
+        } else if (pillar === 'education') {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1.15, height * 0.8, 0.95), body);
+            mesh.position.y = height * 0.4;
+            group.add(mesh);
+            var roof = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.95, 3), trim);
+            roof.rotation.x = Math.PI / 2;
+            roof.rotation.z = Math.PI / 2;
+            roof.position.y = height * 0.8 + 0.3;
+            group.add(roof);
+        } else if (pillar === 'universities') {
+            mesh = new THREE.Mesh(new THREE.BoxGeometry(1.0, height * 0.75, 1.0), body);
+            mesh.position.y = height * 0.375;
+            group.add(mesh);
+            var tower = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, height * 0.45, 12), body);
+            tower.position.y = height * 0.975;
+            group.add(tower);
+            var cap = new THREE.Mesh(new THREE.SphereGeometry(0.34, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), trim);
+            cap.position.y = height * 1.2;
+            group.add(cap);
+        } else {
+            mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.68, height, 6), body);
+            mesh.position.y = height / 2;
+            group.add(mesh);
+            var crown = new THREE.Mesh(new THREE.OctahedronGeometry(0.42), trim);
+            crown.position.y = height + 0.3;
+            group.add(crown);
+        }
+
+        if (height > 2.4) {
+            windowBand(group, 1.0, 0.9, height * 0.35);
+            windowBand(group, 1.0, 0.9, height * 0.62);
+        }
+
+        group.traverse(function (child) {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+
+        group.scale.set(scale, scale, scale);
+        return group;
+    }
+
+    function createClusters() {
+        for (var i = 0; i < clusterLayout.length; i++) {
+            var config = clusterLayout[i];
+            var entities = entitiesFor(config.emirate, config.pillar);
+            if (!entities.length) { continue; }
+
+            var color = pillarColors[config.pillar];
+            var pad = config.radius;
+            var scale = Math.max(0.45, Math.min(1, pad / 1.85));
+            var group = new THREE.Group();
+            group.name = config.emirate + ':' + config.pillar;
+            group.userData.pillar = config.pillar;
+            group.userData.emirate = config.emirate;
+
+            var disc = new THREE.Mesh(
+                new THREE.CylinderGeometry(pad, pad, 0.16, 28),
+                new THREE.MeshLambertMaterial({ color: color, transparent: true, opacity: 0.55 })
+            );
+            disc.position.set(config.x, 1.24, config.z);
+            disc.receiveShadow = true;
+            group.add(disc);
+
+            var count = Math.max(2, Math.min(entities.length, 5));
+            for (var b = 0; b < count; b++) {
+                var angle = (b / count) * Math.PI * 2;
+                var ring = pad * 0.62;
+                var height = 2.2 + (b % 3) * 0.5;
+                var building = createBuilding(config.pillar, color, height, scale);
+                building.position.set(
+                    config.x + Math.cos(angle) * ring,
+                    1.2,
+                    config.z + Math.sin(angle) * ring
+                );
+                building.rotation.y = -angle;
+                group.add(building);
+            }
+
+            group.traverse(function (child) {
+                if (child.isMesh) { clickableMeshes.push(child); }
+            });
+
+            clusterGroups.push(group);
+            scene.add(group);
+        }
+    }
+
+    /* --------------------------- landmarks ---------------------------- */
+
+    function createBurjKhalifa() {
+        var group = new THREE.Group();
+        var material = new THREE.MeshLambertMaterial({ color: 0xE8E8E8 });
+        var sections = [
+            { w: 1.5, h: 5.0, y: 2.5 },
+            { w: 1.1, h: 4.5, y: 7.25 },
+            { w: 0.8, h: 4.0, y: 11.5 },
+            { w: 0.5, h: 3.0, y: 15.0 }
+        ];
+        for (var i = 0; i < sections.length; i++) {
+            var s = sections[i];
+            var block = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h, s.w), material);
+            block.position.y = s.y;
+            block.castShadow = true;
+            group.add(block);
+        }
+        var spire = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.18, 4.0, 8), material);
+        spire.position.y = 18.5;
+        group.add(spire);
+
+        group.position.set(burjPosition.x, burjPosition.y + 0.2, burjPosition.z);
+        scene.add(group);
+
+        var label = makeLabelSprite('Burj Khalifa', '#8e8e93', 5.0);
+        label.position.set(burjPosition.x, 22.5, burjPosition.z);
+        scene.add(label);
+    }
+
+    function createPalmTree(x, z) {
+        var group = new THREE.Group();
+        var trunk = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.12, 0.2, 2.6, 8),
+            new THREE.MeshLambertMaterial({ color: 0x8B5A2B })
+        );
+        trunk.position.y = 1.3;
+        trunk.castShadow = true;
+        group.add(trunk);
+
+        var frondMaterial = new THREE.MeshLambertMaterial({ color: 0x2E8B57, side: THREE.DoubleSide });
+        for (var i = 0; i < 7; i++) {
+            var frond = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.42), frondMaterial);
+            var angle = (i / 7) * Math.PI * 2;
+            frond.position.set(Math.cos(angle) * 0.75, 2.7, Math.sin(angle) * 0.75);
+            frond.rotation.y = -angle;
+            frond.rotation.z = 0.5;
+            group.add(frond);
+        }
+        group.position.set(x, 1.2, z);
+        scene.add(group);
+    }
+
+    function createSandDune(x, z) {
+        var dune = new THREE.Mesh(
+            new THREE.SphereGeometry(4.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2),
+            new THREE.MeshLambertMaterial({ color: 0xE3C99A })
+        );
+        dune.scale.set(1, 0.3, 0.75);
+        dune.position.set(x, 1.15, z);
+        dune.receiveShadow = true;
+        scene.add(dune);
+    }
+
+    function createWindTower(x, z) {
+        var group = new THREE.Group();
+        var wall = new THREE.MeshLambertMaterial({ color: 0xD9C7A7 });
+        var base = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 2.2), wall);
+        base.position.y = 0.8;
+        base.castShadow = true;
+        group.add(base);
+        var tower = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.4, 0.9), wall);
+        tower.position.y = 2.8;
+        tower.castShadow = true;
+        group.add(tower);
+        var cap = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.16, 1.15), new THREE.MeshLambertMaterial({ color: 0xB9A67F }));
+        cap.position.y = 4.05;
+        group.add(cap);
+        group.position.set(x, 1.2, z);
+        scene.add(group);
+    }
+
+    // Origami paper boat: a bevelled leaf shaped hull with a folded peak.
+    var paperColors = [0xffffff, 0xfff1c9, 0xd8ecff, 0xffd9e0, 0xdcf5e0, 0xf3e6ff];
+
+    function createPaperBoat(x, z, index) {
+        var group = new THREE.Group();
+        var tint = paperColors[index % paperColors.length];
+        var paper = new THREE.MeshLambertMaterial({ color: tint });
+        var lines = new THREE.LineBasicMaterial({ color: 0x9aa3ad, transparent: true, opacity: 0.6 });
+
+        var hullShape = new THREE.Shape();
+        hullShape.moveTo(-1.6, 0);
+        hullShape.quadraticCurveTo(-0.8, 0.62, 0, 0.62);
+        hullShape.quadraticCurveTo(0.8, 0.62, 1.6, 0);
+        hullShape.quadraticCurveTo(0.8, -0.62, 0, -0.62);
+        hullShape.quadraticCurveTo(-0.8, -0.62, -1.6, 0);
+        var hullGeometry = new THREE.ExtrudeGeometry(hullShape, {
+            depth: 0.28, bevelEnabled: true, bevelThickness: 0.42, bevelSize: 0.36, bevelSegments: 3
+        });
+        var hull = new THREE.Mesh(hullGeometry, paper);
+        hull.rotation.x = Math.PI / 2;
+        hull.position.y = 0.72;
+        hull.castShadow = true;
+        group.add(hull);
+        var hullEdges = new THREE.LineSegments(new THREE.EdgesGeometry(hullGeometry, 25), lines);
+        hullEdges.rotation.x = Math.PI / 2;
+        hullEdges.position.y = 0.72;
+        group.add(hullEdges);
+
+        var peakShape = new THREE.Shape();
+        peakShape.moveTo(-1.05, 0);
+        peakShape.lineTo(0, 1.15);
+        peakShape.lineTo(1.05, 0);
+        peakShape.closePath();
+        var peakGeometry = new THREE.ExtrudeGeometry(peakShape, { depth: 0.08, bevelEnabled: false });
+        var peak = new THREE.Mesh(peakGeometry, paper);
+        peak.position.set(0, 0.7, -0.04);
+        peak.castShadow = true;
+        group.add(peak);
+        var peakEdges = new THREE.LineSegments(new THREE.EdgesGeometry(peakGeometry, 25), lines);
+        peakEdges.position.set(0, 0.7, -0.04);
+        group.add(peakEdges);
+
+        var foldGeometry = new THREE.PlaneGeometry(0.62, 0.62);
+        var fold = new THREE.Mesh(foldGeometry, new THREE.MeshLambertMaterial({ color: tint, side: THREE.DoubleSide }));
+        fold.position.set(0, 1.42, 0);
+        fold.rotation.z = Math.PI / 4;
+        group.add(fold);
+
+        group.position.set(x, -0.35, z);
+        group.rotation.y = (index * 1.7) % (Math.PI * 2);
+        group.userData.phase = index * 1.3;
+        group.userData.baseY = -0.35;
+        scene.add(group);
+        boats.push(group);
+    }
+
+    function createCloud(x, z, y, size) {
+        var group = new THREE.Group();
+        var material = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.92 });
+        var puffs = [
+            { x: 0, y: 0, r: 1.0 }, { x: 1.1, y: 0.15, r: 0.8 }, { x: -1.0, y: 0.1, r: 0.75 },
+            { x: 0.5, y: 0.55, r: 0.7 }, { x: -0.4, y: 0.5, r: 0.65 }, { x: 1.9, y: -0.05, r: 0.55 }
+        ];
+        for (var i = 0; i < puffs.length; i++) {
+            var puff = new THREE.Mesh(new THREE.SphereGeometry(puffs[i].r, 12, 10), material);
+            puff.position.set(puffs[i].x, puffs[i].y, (i % 2) * 0.35);
+            group.add(puff);
+        }
+        group.scale.set(size, size * 0.75, size);
+        group.position.set(x, y, z);
+        group.userData.speed = 0.4 + (size % 1) * 0.6;
+        scene.add(group);
+        clouds.push(group);
+    }
+
+    function createBird(cx, cz, radius, y, phase) {
+        var group = new THREE.Group();
+        var material = new THREE.MeshBasicMaterial({ color: 0x2f3a46, side: THREE.DoubleSide });
+        var left = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.16), material);
+        left.position.x = -0.35;
+        var right = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.16), material);
+        right.position.x = 0.35;
+        group.add(left);
+        group.add(right);
+        group.userData = { cx: cx, cz: cz, radius: radius, y: y, phase: phase, left: left, right: right };
+        scene.add(group);
+        birds.push(group);
+    }
+
+    function createSky() {
+        var i;
+        var cloudSpots = [
+            { x: -60, z: -20, y: 34, s: 2.4 }, { x: -10, z: -48, y: 38, s: 1.8 }, { x: 30, z: 20, y: 36, s: 2.1 },
+            { x: 80, z: -50, y: 40, s: 1.6 }, { x: -95, z: 40, y: 35, s: 2.6 }, { x: 60, z: 60, y: 37, s: 1.9 },
+            { x: 5, z: 75, y: 39, s: 2.2 }
+        ];
+        for (i = 0; i < cloudSpots.length; i++) {
+            createCloud(cloudSpots[i].x, cloudSpots[i].z, cloudSpots[i].y, cloudSpots[i].s);
+        }
+        for (i = 0; i < 7; i++) {
+            createBird(mapHome.x - 14, mapHome.z + 10, 16 + i * 1.3, 15 + (i % 3) * 0.8, i * 0.9);
+        }
+    }
+
+    function animateScenery(seconds) {
+        var i, boat, cloud, bird, angle, flap;
+        for (i = 0; i < boats.length; i++) {
+            boat = boats[i];
+            boat.position.y = boat.userData.baseY + Math.sin(seconds * 1.4 + boat.userData.phase) * 0.16;
+            boat.rotation.z = Math.sin(seconds * 1.1 + boat.userData.phase) * 0.07;
+            boat.rotation.x = Math.cos(seconds * 0.9 + boat.userData.phase) * 0.05;
+        }
+        for (i = 0; i < clouds.length; i++) {
+            cloud = clouds[i];
+            cloud.position.x += cloud.userData.speed * 0.016;
+            if (cloud.position.x > 140) { cloud.position.x = -150; }
+        }
+        for (i = 0; i < birds.length; i++) {
+            bird = birds[i];
+            angle = seconds * 0.35 + bird.userData.phase;
+            bird.position.set(
+                bird.userData.cx + Math.cos(angle) * bird.userData.radius,
+                bird.userData.y + Math.sin(seconds * 2 + bird.userData.phase) * 0.4,
+                bird.userData.cz + Math.sin(angle) * bird.userData.radius
+            );
+            bird.rotation.y = -angle;
+            flap = Math.sin(seconds * 9 + bird.userData.phase) * 0.6;
+            bird.userData.left.rotation.z = flap;
+            bird.userData.right.rotation.z = -flap;
+        }
+    }
+
+    // Defined before createScenery, called from inside it.
+    function createUAEFlags() {
+        for (var i = 0; i < flagPositions.length; i++) {
+            var pos = flagPositions[i];
+            var flagGroup = new THREE.Group();
+
+            var pole = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08, 0.08, 6, 8),
+                new THREE.MeshLambertMaterial({ color: 0x888888 })
+            );
+            pole.position.y = 3;
+            pole.castShadow = true;
+            flagGroup.add(pole);
+
+            var red = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.5, 1),
+                new THREE.MeshLambertMaterial({ color: 0xFF0000, side: THREE.DoubleSide })
+            );
+            red.position.set(0.75, 5.5, 0);
+            flagGroup.add(red);
+
+            var stripes = [
+                { color: 0x00AA00, y: 5.835 },
+                { color: 0xFFFFFF, y: 5.5 },
+                { color: 0x000000, y: 5.165 }
+            ];
+            for (var s = 0; s < stripes.length; s++) {
+                var stripe = new THREE.Mesh(
+                    new THREE.PlaneGeometry(1.125, 0.33),
+                    new THREE.MeshLambertMaterial({ color: stripes[s].color, side: THREE.DoubleSide })
+                );
+                stripe.position.set(1.125, stripes[s].y, 0.01);
+                flagGroup.add(stripe);
+            }
+
+            flagGroup.position.set(pos.x, 1.2, pos.z);
+            scene.add(flagGroup);
+        }
+    }
+
+    function createScenery() {
+        var i;
+        for (i = 0; i < palmPositions.length; i++) {
+            createPalmTree(palmPositions[i].x, palmPositions[i].z);
+        }
+        for (i = 0; i < dunePositions.length; i++) {
+            createSandDune(dunePositions[i].x, dunePositions[i].z);
+        }
+        for (i = 0; i < windTowerPositions.length; i++) {
+            createWindTower(windTowerPositions[i].x, windTowerPositions[i].z);
+        }
+        for (i = 0; i < dhowPositions.length; i++) {
+            createPaperBoat(dhowPositions[i].x, dhowPositions[i].z, i);
+        }
+        createUAEFlags();
+        createSky();
+    }
+
+    /* ----------------------------- camera ----------------------------- */
+
+    function updateCamera() {
+        var sinPhi = Math.sin(view.phi);
+        camera.position.set(
+            view.tx + view.radius * sinPhi * Math.sin(view.theta),
+            view.ty + view.radius * Math.cos(view.phi),
+            view.tz + view.radius * sinPhi * Math.cos(view.theta)
+        );
+        camera.lookAt(view.tx, view.ty, view.tz);
+        var needle = byId('compass-needle');
+        if (needle) { needle.style.transform = 'rotate(' + (view.theta * 180 / Math.PI) + 'deg)'; }
+    }
+
+    function zoomBy(factor) {
+        view.radius = Math.max(10, Math.min(360, view.radius * factor));
+        updateCamera();
+    }
+
+    function rotateBy(dx, dy) {
+        view.theta -= dx * 0.005;
+        view.phi = Math.max(0.12, Math.min(1.45, view.phi - dy * 0.005));
+        updateCamera();
+    }
+
+    function setupControls(domElement) {
+        var dragging = false;
+        var moved = 0;
+        var lastX = 0;
+        var lastY = 0;
+        var pinchDistance = 0;
+
+        domElement.addEventListener('mousedown', function (event) {
+            dragging = true;
+            moved = 0;
+            lastX = event.clientX;
+            lastY = event.clientY;
+        });
+
+        window.addEventListener('mousemove', function (event) {
+            if (!dragging) { handleHover(event.clientX, event.clientY); return; }
+            var dx = event.clientX - lastX;
+            var dy = event.clientY - lastY;
+            moved += Math.abs(dx) + Math.abs(dy);
+            lastX = event.clientX;
+            lastY = event.clientY;
+            rotateBy(dx, dy);
+        });
+
+        window.addEventListener('mouseup', function (event) {
+            if (dragging && moved < 6) { handlePick(event.clientX, event.clientY); }
+            dragging = false;
+        });
+
+        domElement.addEventListener('wheel', function (event) {
+            event.preventDefault();
+            zoomBy(event.deltaY > 0 ? 1.08 : 0.92);
+        }, { passive: false });
+
+        domElement.addEventListener('touchstart', function (event) {
+            if (event.touches.length === 1) {
+                dragging = true;
+                moved = 0;
+                lastX = event.touches[0].clientX;
+                lastY = event.touches[0].clientY;
+            } else if (event.touches.length === 2) {
+                dragging = false;
+                pinchDistance = Math.hypot(
+                    event.touches[0].clientX - event.touches[1].clientX,
+                    event.touches[0].clientY - event.touches[1].clientY
+                );
+            }
+        }, { passive: true });
+
+        domElement.addEventListener('touchmove', function (event) {
+            if (event.touches.length === 1 && dragging) {
+                var dx = event.touches[0].clientX - lastX;
+                var dy = event.touches[0].clientY - lastY;
+                moved += Math.abs(dx) + Math.abs(dy);
+                lastX = event.touches[0].clientX;
+                lastY = event.touches[0].clientY;
+                rotateBy(dx, dy);
+            } else if (event.touches.length === 2) {
+                var distance = Math.hypot(
+                    event.touches[0].clientX - event.touches[1].clientX,
+                    event.touches[0].clientY - event.touches[1].clientY
+                );
+                if (pinchDistance > 0) { zoomBy(pinchDistance / distance); }
+                pinchDistance = distance;
+            }
+        }, { passive: true });
+
+        domElement.addEventListener('touchend', function (event) {
+            if (dragging && moved < 8 && event.changedTouches.length === 1) {
+                handlePick(event.changedTouches[0].clientX, event.changedTouches[0].clientY);
+            }
+            dragging = false;
+            pinchDistance = 0;
+        });
+    }
+
+    function resetView() {
+        view.radius = HOME.radius;
+        view.theta = HOME.theta;
+        view.phi = HOME.phi;
+        view.tx = HOME.tx;
+        view.ty = HOME.ty;
+        view.tz = HOME.tz;
+        updateCamera();
+    }
+
+    /* -------------------------- interaction --------------------------- */
+
+    function findClusterGroup(object) {
+        var node = object;
+        while (node) {
+            if (node.userData && node.userData.pillar) { return node; }
+            node = node.parent;
+        }
+        return null;
+    }
+
+    function pickCluster(clientX, clientY) {
+        var rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        var hits = raycaster.intersectObjects(clickableMeshes, false);
+        for (var i = 0; i < hits.length; i++) {
+            var group = findClusterGroup(hits[i].object);
+            if (group && group.visible !== false) { return group; }
+        }
+        return null;
+    }
+
+    function handleHover(clientX, clientY) {
+        if (!raycaster) { return; }
+        var group = pickCluster(clientX, clientY);
+        if (group === hoveredGroup) { return; }
+        if (hoveredGroup && hoveredGroup !== selectedGroup) { hoveredGroup.scale.set(1, 1, 1); }
+        hoveredGroup = group;
+        if (hoveredGroup && hoveredGroup !== selectedGroup) { hoveredGroup.scale.set(1.1, 1.1, 1.1); }
+        renderer.domElement.style.cursor = hoveredGroup ? 'pointer' : '';
+    }
+
+    function highlightSelection(group) {
+        if (selectedGroup && selectedGroup !== group) {
+            selectedGroup.scale.set(1, 1, 1);
+        }
+        selectedGroup = group;
+        if (group) { group.scale.set(1.06, 1.06, 1.06); }
+    }
+
+    function handlePick(clientX, clientY) {
+        if (!raycaster) { return; }
+        var group = pickCluster(clientX, clientY);
+        if (!group) { return; }
+        highlightSelection(group);
+        openCategoryPanel(group.userData.pillar, group.userData.emirate);
+    }
+
+    function openCategoryPanel(pillar, emirate) {
+        var entities = entitiesFor(emirate, pillar);
+        var color = hex(pillarColors[pillar]);
+
+        byId('info-title').textContent = pillarNames[pillar] + ' in ' + ecosystemData[emirate].name;
+        byId('info-blurb').textContent = pillarBlurbs[pillar];
+
+        var list = byId('info-tags');
+        list.innerHTML = '';
+        for (var i = 0; i < entities.length; i++) {
+            var entity = entities[i];
+            var tag = document.createElement('a');
+            tag.className = 'tag';
+            tag.href = entity.url;
+            tag.target = '_blank';
+            tag.rel = 'noopener noreferrer';
+            tag.title = entity.note || entity.name;
+            tag.style.borderColor = color;
+            var dot = document.createElement('span');
+            dot.className = 'tag-dot';
+            dot.style.background = color;
+            tag.appendChild(dot);
+            tag.appendChild(document.createTextNode(entity.name));
+            list.appendChild(tag);
+        }
+
+        byId('info-count').textContent = entities.length === 1
+            ? '1 organisation'
+            : entities.length + ' organisations';
+        byId('info-panel').classList.remove('hidden');
+    }
+
+    function applyFilter(pillar) {
+        activePillar = pillar;
+        var visible = 0;
+        for (var i = 0; i < clusterGroups.length; i++) {
+            var group = clusterGroups[i];
+            var on = (pillar === 'all' || pillar === group.userData.pillar);
+            group.visible = on;
+            if (on) { visible += entitiesFor(group.userData.emirate, group.userData.pillar).length; }
+        }
+        byId('active-filter').textContent = pillar === 'all' ? 'All' : pillarNames[pillar];
+        byId('visible-count').textContent = String(visible);
+
+        if (selectedGroup && pillar !== 'all' && selectedGroup.userData.pillar !== pillar) {
+            highlightSelection(null);
+            byId('info-panel').classList.add('hidden');
+        }
+    }
+
+    /* ----------------------------- lesson ----------------------------- */
+
+    function renderLessonStep() {
+        var step = lessonSteps[lessonIndex];
+        var container = byId('lesson-step');
+        container.innerHTML = '';
+
+        var heading = document.createElement('h3');
+        heading.textContent = step.heading;
+        container.appendChild(heading);
+
+        var english = document.createElement('p');
+        english.textContent = step.english;
+        container.appendChild(english);
+
+        var arabic = document.createElement('div');
+        arabic.className = 'arabic-text';
+        arabic.setAttribute('dir', 'rtl');
+        arabic.setAttribute('lang', 'ar');
+        arabic.textContent = step.arabic;
+        container.appendChild(arabic);
+
+        byId('lesson-progress').textContent = 'Step ' + (lessonIndex + 1) + ' of ' + lessonSteps.length;
+        byId('lesson-prev').disabled = lessonIndex === 0;
+        byId('lesson-next').textContent = lessonIndex === lessonSteps.length - 1 ? 'Complete ✓' : 'Next';
+    }
+
+    function openLesson() {
+        lessonIndex = 0;
+        renderLessonStep();
+        byId('lesson-modal').classList.remove('hidden');
+    }
+
+    function closeLesson() {
+        byId('lesson-modal').classList.add('hidden');
+    }
+
+    /* ------------------------------ scene ----------------------------- */
+
+    function buildScene() {
+        var container = byId('scene-container');
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xBFE3F5);
+        scene.fog = new THREE.Fog(0xBFE3F5, 280, 760);
+
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2000);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+        scene.add(new THREE.HemisphereLight(0xffffff, 0xE3C99A, 0.35));
+
+        var sun = new THREE.DirectionalLight(0xffffff, 0.85);
+        sun.position.set(60, 160, 110);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.near = 1;
+        sun.shadow.camera.far = 520;
+        sun.shadow.camera.left = -230;
+        sun.shadow.camera.right = 230;
+        sun.shadow.camera.top = 230;
+        sun.shadow.camera.bottom = -230;
+        sun.shadow.camera.updateProjectionMatrix();
+        scene.add(sun);
+
+        raycaster = new THREE.Raycaster();
+        pointer = new THREE.Vector2();
+
+        view.tx = mapHome.x; view.tz = mapHome.z;
+        HOME.tx = mapHome.x; HOME.tz = mapHome.z;
+
+        createOcean();
+        createEmirates();
+        createClusters();
+        createBurjKhalifa();
+        createScenery();
+
+        updateCamera();
+        setupControls(renderer.domElement);
+
+        window.addEventListener('resize', function () {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        running = true;
+        startTime = (window.performance && window.performance.now) ? window.performance.now() : Date.now();
+        animate();
+    }
+
+    function animate() {
+        if (!running) { return; }
+        window.requestAnimationFrame(animate);
+        var now = (window.performance && window.performance.now) ? window.performance.now() : Date.now();
+        animateScenery((now - startTime) / 1000);
+        renderer.render(scene, camera);
+    }
+
+    /* ------------------------------- UI ------------------------------- */
+
+    function wireInterface() {
+        var total = totalEntities();
+        byId('total-entities').textContent = String(total);
+        byId('visible-count').textContent = String(total);
+
+        var buttons = document.querySelectorAll('.filter-btn');
+        for (var i = 0; i < buttons.length; i++) {
+            buttons[i].addEventListener('click', function (event) {
+                var all = document.querySelectorAll('.filter-btn');
+                for (var j = 0; j < all.length; j++) { all[j].classList.remove('active'); }
+                event.currentTarget.classList.add('active');
+                applyFilter(event.currentTarget.getAttribute('data-pillar'));
+            });
+        }
+
+        byId('zoom-in').addEventListener('click', function () { zoomBy(0.82); });
+        byId('zoom-out').addEventListener('click', function () { zoomBy(1.22); });
+
+        byId('reset-view').addEventListener('click', resetView);
+        byId('close-info').addEventListener('click', function () {
+            byId('info-panel').classList.add('hidden');
+            highlightSelection(null);
+        });
+        byId('toggle-help').addEventListener('click', function () {
+            byId('help-panel').classList.toggle('hidden');
+        });
+        byId('close-help').addEventListener('click', function () {
+            byId('help-panel').classList.add('hidden');
+        });
+
+        byId('start-lesson').addEventListener('click', openLesson);
+        byId('close-lesson').addEventListener('click', closeLesson);
+        byId('lesson-prev').addEventListener('click', function () {
+            if (lessonIndex > 0) { lessonIndex--; renderLessonStep(); }
+        });
+        byId('lesson-next').addEventListener('click', function () {
+            if (lessonIndex < lessonSteps.length - 1) {
+                lessonIndex++;
+                renderLessonStep();
+            } else {
+                closeLesson();
+            }
+        });
+        byId('lesson-modal').addEventListener('click', function (event) {
+            if (event.target === byId('lesson-modal')) { closeLesson(); }
+        });
+    }
+
+    /* ------------------------------ boot ------------------------------ */
+
+    function loadThreeThenBuild() {
+        if (window.THREE) { buildScene(); return; }
+        var script = document.createElement('script');
+        script.src = THREE_URL;
+        script.onload = function () {
+            try {
+                buildScene();
+            } catch (error) {
+                showError(error && error.message ? error.message : String(error));
+            }
+        };
+        script.onerror = function () {
+            showError('the 3D library could not be downloaded. Check the internet connection and reload.');
+        };
+        document.head.appendChild(script);
+    }
+
+    window.addEventListener('error', function (event) {
+        showError(event.message || 'script error');
+    });
+
+    window.addEventListener('load', function () {
+        wireInterface();
+
+        byId('start-button').addEventListener('click', function () {
+            byId('intro-screen').style.display = 'none';
+            byId('main-container').style.display = 'block';
+            loadThreeThenBuild();
+        });
+    });
+})();
+</script>
+</body>
+</html>
